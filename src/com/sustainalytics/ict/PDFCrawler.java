@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.regex.Pattern;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -16,14 +17,20 @@ import edu.uci.ics.crawler4j.url.WebURL;
 
 /**
  * @author Sustainalytics
- * @version 3.2 May 05 2015
+ * @version 3.3 May 06 2015
  * 
  *          This class shows how you can crawl PDFs on the web and store them in
  *          a folder. Also the program crawls and downloads html pages that
- *          contain some specific terms. With 3.0 and 3.1 in terms of
- *          functionality, it has a few differences: (1) It does not create
- *          folders to keep the htmls and pdfs whose names are company urls,
- *          rather it takes argument from the main method to store them.
+ *          contain some specific terms. 
+ *          CHANGE:
+ *          THE PDFS AND HTMLS WILL BE DOWNLOADED AS BEFORE BUT WHEN A NEW HTML OR
+ *          PDF IS ENCOUNTERED, A LOG ENTRY IS CREATED AND RECORDED.
+ *          
+ *          ALSO, FOR HTMLS, THE SCRIPT OF ANDREI WILL CONVERT THEM TO .TXTS. SO WHEN 
+ *          WE COMPARE THE CRAWLED HTMLS, WE FIRST CREATE A LOGICAL FILE WITH THE HTML'S
+ *          NAME + .TXT EXTENSION TO SEE WHETHER THEY ARE PRESENT IN THE DIRECOTRY OR NOT.
+ *          IF NOTHING IS FOUND, THEN THE FILE IS NEW AND WILL BE STORED AS HTML (WHICH WILL LATER BE
+ *          CONVERTED INTO .TXT AGAIN WITH ANDREI'S SCRIPT
  */
 public class PDFCrawler extends WebCrawler {
 	// -------------------------------------------------------------------------------------------------------------------
@@ -44,9 +51,9 @@ public class PDFCrawler extends WebCrawler {
 	private static File storageFolder;
 	private static String crawlDomain = "";
 	private static File folder;
-	// For naming unnamed html and pdf. It was not used in V3.0 but we have
-	// plans to work on this later
-	private int htmlSequence = 0, pdfSequence = 0;
+
+	private static String logEntry = "";
+	private static int nameCounter = 0;
 
 	// -------------------------------------------------------------------------------------------------------------------
 	// Method Section
@@ -115,7 +122,7 @@ public class PDFCrawler extends WebCrawler {
 	 * done!
 	 */
 	@Override
-	public void visit(Page page) {
+	public synchronized void visit(Page page) {
 
 		String url = page.getWebURL().getURL();
 
@@ -142,19 +149,34 @@ public class PDFCrawler extends WebCrawler {
 				// System.out.println("-- Regular Expression Matched, Storing HTML --");
 
 				// Storing HTML--->
-				String hashedName = FilenameUtils.getBaseName(url).replaceAll(
+				
+				String htmlBaseName = FilenameUtils.getBaseName(url).replaceAll(
 						"[^a-zA-Z0-9.-]", ""); // getting rid of characters not
-												// allowed in Windows file names
-				String filename = folder.getAbsolutePath() + "/" + hashedName
+				// allowed in Windows file names
+				String htmlFileName = folder.getAbsolutePath() + "/" + htmlBaseName
 						+ ".html";
-				File output = new File(filename); // output file
-				// if the file does not exist, it is a new file. Download --->
-				if (!output.exists()) {
+				
+				File output = new File(htmlFileName);
+				if(output.exists()){
+					
+					htmlBaseName = htmlBaseName + "-" + nameCounter;
+					nameCounter ++;
+					
+					htmlFileName = folder.getAbsolutePath() + "/" + htmlBaseName + ".html";
+					
+				}
+				/*The htmls are converted into .txt files
+				 * So, we create a logical .txt extension to check whether they are present in the directory or not*/
+				String textFileName = folder.getAbsolutePath() + "/" + htmlBaseName + ".txt";
+				File outputTXT = new File (textFileName); 
+				// if the file does not exist, it is a new file. Download and record in the log file--->
+				if (!outputTXT.exists()) {
 
-					System.out.println("---A new file is found " + filename
-							+ " ---");
 					try {
-						Files.write(page.getContentData(), new File(filename));
+						Files.write(page.getContentData(), new File(htmlFileName));
+						System.out.println("---A new file is found " + htmlFileName
+								+ " ---");
+						logEntry += htmlFileName + "\n"; // populate logEntry variable with the newly written PDF file name
 					} catch (IOException iox) {
 						System.out.println("Error storing HTMLs");
 					}
@@ -177,21 +199,20 @@ public class PDFCrawler extends WebCrawler {
 		}
 
 		// Naming the PDF file
-		String extension = url.substring(url.lastIndexOf("."));
-		String hashedName = FilenameUtils.getBaseName(url).replaceAll(
+		String pdfExtension = url.substring(url.lastIndexOf("."));
+		String pdfName = FilenameUtils.getBaseName(url).replaceAll(
 				"[^a-zA-Z0-9.-]", "")
-				+ extension; // removing characters not allowed in Windows file
-								// system
-		String filename = folder.getAbsolutePath() + "/" + hashedName;
-		File output = new File(filename); // output file
+				+ pdfExtension; // removing characters not allowed in Windows file
+		// system
+		String pdfFileName = folder.getAbsolutePath() + "/" + pdfName;
+		File output = new File(pdfFileName); // output file
 		// if the file is new--->
 		if (!output.exists()) {
-
-			System.out.println("---A new file is found " + filename + " ---");
-
 			// store PDF--->
 			try {
-				Files.write(page.getContentData(), new File(filename));
+				Files.write(page.getContentData(), new File(pdfFileName));
+				System.out.println("---A new file is found " + pdfFileName + " ---");
+				logEntry += pdfFileName + "\n"; // populate logEntry variable with the newly written PDF file name
 			} catch (IOException iox) {
 				System.out.println("Error storing PDFs");
 			}
@@ -202,4 +223,17 @@ public class PDFCrawler extends WebCrawler {
 
 	}// end overridden visit() method
 
-}// end clas
+	/**
+	 * Static Method to write the log file that contains newly written PDFs and HTMLs 
+	 */
+	public static void writeLogFile(){
+		
+		File logFile = new File (folder.getAbsolutePath() + "/" + "log.txt");
+		try {
+			FileUtils.write(logFile, logEntry, null);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}//end method that writes newly written pdf and htmls to a log file
+
+}// end class

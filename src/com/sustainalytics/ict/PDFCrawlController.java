@@ -3,6 +3,12 @@ package com.sustainalytics.ict;
 import java.time.Duration;
 import java.time.Instant;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.PosixParser;
+
 import edu.uci.ics.crawler4j.crawler.CrawlConfig;
 import edu.uci.ics.crawler4j.crawler.CrawlController;
 import edu.uci.ics.crawler4j.fetcher.PageFetcher;
@@ -13,40 +19,113 @@ import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
  * The controller class for the crawler. It has a big difference with its
  * previous version.
  * 
- * It has a main method that takes two arguments: (1) URL to crawl (2) Directory
- * to save the files. The method configures the crawler parameters. Also the
- * method keeps track of the time taken by the crawler.
+ * CHANGES:
+ * 
+ * POWERED WITH APACHE CLI THAT TAKES MULTIPLE ARGUMENTS. THE URL AND
+ * FOLDER NAME TO STORE PDFS AND HTMLS ARE MANDATORY FIELDS. OTHERS ARE OPTIONAL
+ * AND HAVE THEIR OWN DEFAULT VALUES SET.
+ * 
+ * IT ALSO IN THE END, CALLS A WRITE METHOD () IN PDFCRAWLER CLASS TO WRITE DOWN THE
+ * LOG ENTRIES. THE LOG ENTRIES ARE THE NAMES OF THE NEWLY ADDED/STORED PDFS
+ * AND HTMLS.
  * 
  * @author Sustainalytics
- * @version 2.0 May 05 2015
+ * @version 2.1 May 06 2015
  *
  */
 
 public class PDFCrawlController {
 
 	public static void main(String[] args) throws Exception {
+		
+		/*Apache CLI options --->*/
+		Options options = new Options();
+		options.addOption("u", true, "URL to crawl (include http://)");
+		options.addOption("f", true, "Folder to store");
+		options.addOption("p", true, "Politeness in Miliseconds (Default 1000), OPTIONAL");
+		options.addOption("d", true, "Depth of Crawling (Default 10), OPATIONAL");
+		options.addOption("h", false, "Help page, OPTIONAL");
+		options.addOption("t", true, "No. of Threads Per Website (Default 10), OPTIONAL");
+		
+		/*<---Apache CLI options ends*/
+		CommandLineParser parser = new PosixParser();
+		CommandLine cmd = parser.parse(options, args);
+
+		/* The two mandatory CLI options---> */
+		if (!cmd.hasOption("u") || !cmd.hasOption("f")) {
+			System.out.println("You must provide both URL and Directory name");
+			HelpFormatter formatter = new HelpFormatter();
+			formatter.printHelp( " ", options );
+			System.exit(1);
+		}
+		/*<---the mandatory option handling ends here*/
+
+		/*Help section*/
+		if (cmd.hasOption("h")){
+			HelpFormatter formatter = new HelpFormatter();
+			formatter.printHelp( " ", options );
+		}
+		
+		/*Get the CLI parameters into variables*/
+		String url = cmd.getOptionValue("u");
+		String folder = cmd.getOptionValue("f");
+		String politeness = cmd.getOptionValue("p");
+		String crawlDepth = cmd.getOptionValue("d");
+		String thread = cmd.getOptionValue("t");
+
 		/*
 		 * Configuration storage, no. of crawlers to start with, storage folder
 		 * for the downloaded PDFs
 		 */
 		String rootFolder = "crawler4jStorage";
-		int numberOfCrawlers = 10;
+		int numberOfCrawlers;
+		
+		if (cmd.hasOption("t")) {
+		
+			numberOfCrawlers = Integer.parseInt(thread);
+		
+		}
+		
+		else{
+		
+			numberOfCrawlers = 10;
+		
+		}
 		String storageFolder = "pdfstorage";
 
-		if (args.length < 2) {
-			System.out.println("You must provide URL and Directory name");
-			System.exit(1);
-		}
-
+		/*Monitoring execution time for performance analysis*/
 		Instant start = Instant.now();
+		
 		// Let's configure the crawler--->
 		CrawlConfig config = new CrawlConfig();
 		config.setCrawlStorageFolder(rootFolder); // configuration folder
-		config.setIncludeBinaryContentInCrawling(true); // PDFs are binary
-														// contents
-		config.setPolitenessDelay(1000); // We are very unpolite. In miliseconds
-		config.setMaxDepthOfCrawling(10); // Infinite depth
-		config.setMaxPagesToFetch(-1); // Infite fetching of pges
+		config.setIncludeBinaryContentInCrawling(true); // PDFs are binary contents
+		
+		if (cmd.hasOption("p")) {
+			
+			config.setPolitenessDelay(Integer.parseInt(politeness)); // politeness provided by the user (in ms)
+		
+		} 
+		
+		else {
+		
+			config.setPolitenessDelay(1000); // We are very polite by default (1s)
+		
+		}
+		
+		if (cmd.hasOption("d")) {
+		
+			config.setMaxDepthOfCrawling(Integer.parseInt(crawlDepth)); // depth of crawling by the user
+		
+		} 
+		
+		else {
+		
+			config.setMaxDepthOfCrawling(10); // default depth set to 10
+		
+		}
+		
+		config.setMaxPagesToFetch(-1); // Infinite fetching of pages
 		config.setIncludeHttpsPages(true); // We move to secured http as well
 		config.setMaxDownloadSize(20000000); // Quite a huge file size. In bytes
 
@@ -57,15 +136,17 @@ public class PDFCrawlController {
 		CrawlController controller = new CrawlController(config, pageFetcher,
 				robotstxtServer);
 
-		controller.setCustomData(args[0].trim());
-		controller.addSeed(args[0].trim());
+		controller.setCustomData(url.trim());
+		controller.addSeed(url.trim());
 
 		// <---configuration done!
 
 		// Set the crawler with all the configurations and start it
-		PDFCrawler.configure(args[0].trim(), storageFolder, args[1].trim());
+		PDFCrawler.configure(url.trim(), storageFolder, folder.trim());
 		controller.start(PDFCrawler.class, numberOfCrawlers);
 
+		PDFCrawler.writeLogFile();
+		
 		Instant end = Instant.now();
 		System.out.println("Completion time: " + Duration.between(start, end));
 
