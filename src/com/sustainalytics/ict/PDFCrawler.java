@@ -2,9 +2,6 @@ package com.sustainalytics.ict;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
@@ -20,14 +17,19 @@ import edu.uci.ics.crawler4j.url.WebURL;
 
 /**
  * @author Sustainalytics
- * @version 3.3 May 06 2015
+ * @version 3.3 May 07 2015
  * 
  *          This class shows how you can crawl PDFs on the web and store them in
  *          a folder. Also the program crawls and downloads html pages that
  *          contain some specific terms. 
+ *          
  *          CHANGE:
- *          THE PDFS AND HTMLS WILL BE DOWNLOADED AS BEFORE BUT WHEN A NEW HTML OR
- *          PDF IS ENCOUNTERED, A LOG ENTRY IS CREATED AND RECORDED.
+ *          MANY HTMLS HAVE DUPLICATE NAMES. THE PREVIOUS VERSIONS DO NOT HAVE 
+ *          FUNCTIONALITY TO HANDLE THEM. THIS VERSION RENAMES THE DUPLICATE HTML FILES.
+ *          NO SUCH FUNCTIONALITY FOR PDFS AS THERE ARE ALMOST NO CHNCE THAT THE PDFS
+ *          WILL HAVE SAME NAME. 
+ *          
+ *          THIS VERSION ALSO KEEPS TRACK OF THE NEWLY DOWNLOADED FILES.
  *          
  *          
  */
@@ -51,20 +53,21 @@ public class PDFCrawler extends WebCrawler {
 	private static String crawlDomain = "";
 	private static File folder;
 
+	//for log file entry
 	private static String logEntry = "";
-	private static int nameCounter = 0;
 
-	private static SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
 	// -------------------------------------------------------------------------------------------------------------------
 	// Method Section
 	// -------------------------------------------------------------------------------------------------------------------
 	/**
-	 * Method to set the configuration parameters of the crawler
+	 * Method to set the starting url and domain, storage folder and company folder
 	 * 
 	 * @param domain
 	 *            is the company url to start with
 	 * @param storageFolderName
-	 *            is a string shows where to store the downloaded pdfs
+	 *            is a string shows where to store the company folder
+	 * @param companyFolderName
+	 * 				is a string that is taken from the user to store the pdf and html files
 	 */
 	public static void configure(String domain, String storageFolderName,
 			String companyFolderName) {
@@ -99,12 +102,14 @@ public class PDFCrawler extends WebCrawler {
 		if (filters.matcher(href).matches()) {
 			return false;
 		}
+		
 		/*
 		 * Do not crawl pages that are outside of the domain name
 		 */
 		if (href.startsWith(crawlDomain)) {
 			return true;
 		}
+		
 		/*
 		 * PDFs? Perfect!
 		 */
@@ -116,11 +121,12 @@ public class PDFCrawler extends WebCrawler {
 		 * No if condition met? Then do not crawl!
 		 */
 		return false;
+		
 	}// end overridden shouldVisit() method
 
 	/**
-	 * Visit Method. visit a page and if PDF is found, download and store. Job
-	 * done!
+	 * Visit Method. visit a page and if certain conditions met, then download the htmls. If PDFs are found
+	 * then downlode them. Job done!
 	 */
 	@Override
 	public synchronized void visit(Page page) {
@@ -147,22 +153,26 @@ public class PDFCrawler extends WebCrawler {
 					|| StringUtils.containsIgnoreCase(text, "child labor")
 					|| StringUtils.containsIgnoreCase(text, "sust")
 					|| StringUtils.containsIgnoreCase(text, "sppl")) {
-				// System.out.println("-- Regular Expression Matched, Storing HTML --");
 
 				// Storing HTML--->
-
-				String htmlBaseName = FilenameUtils.getBaseName(url).replaceAll(
-						"[^a-zA-Z0-9.-]", ""); // getting rid of characters not
-				// allowed in Windows file names
+				/*
+				 * Every html will have a unique name. So, let the name be: url + base name without characters invalid for windows as file name 
+				 */
+				String htmlBaseName = FilenameUtils.removeExtension(url).replaceAll(
+						"[^a-zA-Z0-9.-]", ""); 
 				String htmlFileName = folder.getAbsolutePath() + "/" + htmlBaseName
 						+ ".html";
+				/*
+				 * The python script will convert all htmls to txts
+				 */
 				String txtFileName = folder.getAbsolutePath() + "/" + htmlBaseName
 						+ ".txt";
-				
-				File outputHTML = new File(htmlFileName);
 				File outputTXT = new File(txtFileName);
-				if(!outputHTML.exists() && !outputTXT.exists()){
-
+				
+				//Let's check whether the crawled html file exists in the directory --->
+				/* If the HTML file is not present in text format (previously saved by the python code), then download the html, and write it down in the log file --->*/
+				if(!outputTXT.exists()){
+					
 					try {
 						Files.write(page.getContentData(), new File(htmlFileName));
 						System.out.println("--- I found a new HTML: " + htmlBaseName + " ---");
@@ -171,49 +181,35 @@ public class PDFCrawler extends WebCrawler {
 						System.out.println("Error storing HTMLs");
 					}
 
-				}
+				}//<--- downloading new html is done so as the writing a log for the file.
+				
+				/* If the HTML file is already present in text format (previously saved by the python code), then download the html but don't write it down in the log file --->*/
 				else{
 					
-					htmlBaseName = htmlBaseName + "____" + nameCounter;
-					nameCounter ++;
-
-					htmlFileName = folder.getAbsolutePath() + "/" + htmlBaseName + ".html";
-					txtFileName = folder.getAbsolutePath() + "/" + htmlBaseName + ".txt";
-
-					outputHTML = new File(htmlFileName);
-					outputTXT = new File(txtFileName);
-
-					if(!outputHTML.exists() && !outputTXT.exists()){
-
-
-						try {
-							Files.write(page.getContentData(), new File(htmlFileName));
-							System.out.println("--- I found a new HTML: " + htmlBaseName + " ---");
-							logEntry += htmlBaseName + ".html" + "\n";
-						} catch (IOException iox) {
-							System.out.println("Error storing HTMLs");
-						}
+					try {
+						Files.write(page.getContentData(), new File(htmlFileName));
+					} catch (IOException iox) {
+						System.out.println("Error storing HTMLs");
 					}
 
-				}//end else
+				}//<--- dealing with old htmls is done
 
+			}// <--- checking for some terms in the htmls is done
 
-			}// <--- the html is new
-
-			// <---HTML storing done
-
-		}// <---yes, the data was HTML
+		}// <--- dealing with htmls is done
 
 		/*
-		 * Return if there is no PDF
+		 * Return if there is no PDF ....
 		 */
 		if (!pdfPatterns.matcher(url).matches()) {
-
 			return;
-
 		}
+		
+		/*
+		 *... Otherwise, continue with downloading the pdf 
+		 */
 
-		// Naming the PDF file
+		/* Preparing folders and names for the pdf file*/
 		String pdfExtension = url.substring(url.lastIndexOf("."));
 		String pdfName = FilenameUtils.getBaseName(url).replaceAll(
 				"[^a-zA-Z0-9.-]", "")
@@ -221,9 +217,11 @@ public class PDFCrawler extends WebCrawler {
 		// system
 		String pdfFileName = folder.getAbsolutePath() + "/" + pdfName;
 		File output = new File(pdfFileName); // output file
+		
 		// if the file is new--->
 		if (!output.exists()) {
-			// store PDF--->
+		
+			// store PDF and add an entry to the log file--->
 			try {
 				Files.write(page.getContentData(), new File(pdfFileName));
 				System.out.println("--- I found a new PDF: " + pdfName + " ---");
@@ -233,7 +231,6 @@ public class PDFCrawler extends WebCrawler {
 			}
 
 		}// <--- the file was new
-
 		// <--- Done storing PDF!
 
 	}// end overridden visit() method
@@ -244,6 +241,7 @@ public class PDFCrawler extends WebCrawler {
 	public static void writeLogFile(){
 
 		File logFile = new File (folder.getAbsolutePath() + "/" + "log.txt");
+		
 		try {
 			FileUtils.write(logFile, logEntry, null);
 		} catch (IOException e) {
