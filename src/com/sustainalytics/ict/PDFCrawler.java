@@ -2,6 +2,9 @@ package com.sustainalytics.ict;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
@@ -26,11 +29,7 @@ import edu.uci.ics.crawler4j.url.WebURL;
  *          THE PDFS AND HTMLS WILL BE DOWNLOADED AS BEFORE BUT WHEN A NEW HTML OR
  *          PDF IS ENCOUNTERED, A LOG ENTRY IS CREATED AND RECORDED.
  *          
- *          ALSO, FOR HTMLS, THE SCRIPT OF ANDREI WILL CONVERT THEM TO .TXTS. SO WHEN 
- *          WE COMPARE THE CRAWLED HTMLS, WE FIRST CREATE A LOGICAL FILE WITH THE HTML'S
- *          NAME + .TXT EXTENSION TO SEE WHETHER THEY ARE PRESENT IN THE DIRECOTRY OR NOT.
- *          IF NOTHING IS FOUND, THEN THE FILE IS NEW AND WILL BE STORED AS HTML (WHICH WILL LATER BE
- *          CONVERTED INTO .TXT AGAIN WITH ANDREI'S SCRIPT
+ *          
  */
 public class PDFCrawler extends WebCrawler {
 	// -------------------------------------------------------------------------------------------------------------------
@@ -55,6 +54,7 @@ public class PDFCrawler extends WebCrawler {
 	private static String logEntry = "";
 	private static int nameCounter = 0;
 
+	private static SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
 	// -------------------------------------------------------------------------------------------------------------------
 	// Method Section
 	// -------------------------------------------------------------------------------------------------------------------
@@ -82,6 +82,7 @@ public class PDFCrawler extends WebCrawler {
 		if (!folder.exists()) {
 			folder.mkdirs();
 		}
+
 	}// end method to configure the crawler
 
 	/**
@@ -149,43 +150,57 @@ public class PDFCrawler extends WebCrawler {
 				// System.out.println("-- Regular Expression Matched, Storing HTML --");
 
 				// Storing HTML--->
-				
+
 				String htmlBaseName = FilenameUtils.getBaseName(url).replaceAll(
 						"[^a-zA-Z0-9.-]", ""); // getting rid of characters not
 				// allowed in Windows file names
 				String htmlFileName = folder.getAbsolutePath() + "/" + htmlBaseName
 						+ ".html";
+				String txtFileName = folder.getAbsolutePath() + "/" + htmlBaseName
+						+ ".txt";
 				
-				File output = new File(htmlFileName);
-				if(output.exists()){
-					
-					htmlBaseName = htmlBaseName + "-" + nameCounter;
-					nameCounter ++;
-					
-					htmlFileName = folder.getAbsolutePath() + "/" + htmlBaseName + ".html";
-					
-				}
-				/*The htmls are converted into .txt files
-				 * So, we create a logical .txt extension to check whether they are present in the directory or not*/
-				String textFileName = folder.getAbsolutePath() + "/" + htmlBaseName + ".txt";
-				File outputTXT = new File (textFileName); 
-				// if the file does not exist, it is a new file. Download and record in the log file--->
-				if (!outputTXT.exists()) {
+				File outputHTML = new File(htmlFileName);
+				File outputTXT = new File(txtFileName);
+				if(!outputHTML.exists() && !outputTXT.exists()){
 
 					try {
 						Files.write(page.getContentData(), new File(htmlFileName));
-						System.out.println("---A new file is found " + htmlFileName
-								+ " ---");
-						logEntry += htmlFileName + "\n"; // populate logEntry variable with the newly written PDF file name
+						System.out.println("--- I found a new HTML: " + htmlBaseName + " ---");
+						logEntry += htmlBaseName + ".html" + "\n";
 					} catch (IOException iox) {
 						System.out.println("Error storing HTMLs");
 					}
 
-				}// <--- the html is new
+				}
+				else{
+					
+					htmlBaseName = htmlBaseName + "____" + nameCounter;
+					nameCounter ++;
 
-				// <---HTML storing done
+					htmlFileName = folder.getAbsolutePath() + "/" + htmlBaseName + ".html";
+					txtFileName = folder.getAbsolutePath() + "/" + htmlBaseName + ".txt";
 
-			}// <---selection of webpage to download is done
+					outputHTML = new File(htmlFileName);
+					outputTXT = new File(txtFileName);
+
+					if(!outputHTML.exists() && !outputTXT.exists()){
+
+
+						try {
+							Files.write(page.getContentData(), new File(htmlFileName));
+							System.out.println("--- I found a new HTML: " + htmlBaseName + " ---");
+							logEntry += htmlBaseName + ".html" + "\n";
+						} catch (IOException iox) {
+							System.out.println("Error storing HTMLs");
+						}
+					}
+
+				}//end else
+
+
+			}// <--- the html is new
+
+			// <---HTML storing done
 
 		}// <---yes, the data was HTML
 
@@ -211,8 +226,8 @@ public class PDFCrawler extends WebCrawler {
 			// store PDF--->
 			try {
 				Files.write(page.getContentData(), new File(pdfFileName));
-				System.out.println("---A new file is found " + pdfFileName + " ---");
-				logEntry += pdfFileName + "\n"; // populate logEntry variable with the newly written PDF file name
+				System.out.println("--- I found a new PDF: " + pdfName + " ---");
+				logEntry += pdfName + "\n"; // populate logEntry variable with the newly written PDF file name
 			} catch (IOException iox) {
 				System.out.println("Error storing PDFs");
 			}
@@ -227,7 +242,7 @@ public class PDFCrawler extends WebCrawler {
 	 * Static Method to write the log file that contains newly written PDFs and HTMLs 
 	 */
 	public static void writeLogFile(){
-		
+
 		File logFile = new File (folder.getAbsolutePath() + "/" + "log.txt");
 		try {
 			FileUtils.write(logFile, logEntry, null);
