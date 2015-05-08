@@ -21,16 +21,16 @@ import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
  * 
  * CHANGES:
  * 
- * POWERED WITH APACHE CLI THAT TAKES MULTIPLE ARGUMENTS. THE URL AND
- * FOLDER NAME TO STORE PDFS AND HTMLS ARE MANDATORY FIELDS. OTHERS ARE OPTIONAL
- * AND HAVE THEIR OWN DEFAULT VALUES SET.
+ * -c option is introduced because we had some problems running multiple crawler
+ * instances with the same storage folder (the folder is locked)
  * 
- * IT ALSO IN THE END, CALLS A WRITE METHOD () IN PDFCRAWLER CLASS TO WRITE DOWN THE
- * LOG ENTRIES. THE LOG ENTRIES ARE THE NAMES OF THE NEWLY ADDED/STORED PDFS
- * AND HTMLS.
+ * the option takes folder names from command line where it stores its configuration 
+ * files
+ * 
  * 
  * @author Sustainalytics
- * @version 2.1 May 06 2015
+ * @version 3.3.2 May 08 2015
+ * internal version 2.2
  *
  */
 
@@ -46,14 +46,15 @@ public class PDFCrawlController {
 		options.addOption("d", true, "Depth of Crawling (Default 10), OPATIONAL");
 		options.addOption("h", false, "Help page, OPTIONAL");
 		options.addOption("t", true, "No. of Threads Per Website (Default 10), OPTIONAL");
+		options.addOption("c", true, "Crawler Storage Folder");
 		
 		/*<---Apache CLI options ends*/
 		CommandLineParser parser = new PosixParser();
 		CommandLine cmd = parser.parse(options, args);
 
 		/* The two mandatory CLI options---> */
-		if (!cmd.hasOption("u") || !cmd.hasOption("f")) {
-			System.out.println("You must provide both URL and Directory name");
+		if (!cmd.hasOption("u") || !cmd.hasOption("f") || !cmd.hasOption("c")) {
+			System.out.println("You must provide both URL and Directory name, and Crawler configuration storage!");
 			HelpFormatter formatter = new HelpFormatter();
 			formatter.printHelp( " ", options );
 			System.exit(1);
@@ -72,12 +73,12 @@ public class PDFCrawlController {
 		String politeness = cmd.getOptionValue("p");
 		String crawlDepth = cmd.getOptionValue("d");
 		String thread = cmd.getOptionValue("t");
-
+		String rootFolder = cmd.getOptionValue("c");
 		/*
 		 * Configuration storage, no. of crawlers to start with, storage folder
 		 * for the downloaded PDFs
 		 */
-		String rootFolder = "crawler4jStorage";
+		//String rootFolder = "crawler4jStorage";
 		int numberOfCrawlers;
 		
 		if (cmd.hasOption("t")) {
