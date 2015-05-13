@@ -17,18 +17,17 @@ import edu.uci.ics.crawler4j.url.WebURL;
 
 /**
  * @author Sustainalytics
- * @version 3.5.0 May 12 2015
+ * @version 3.6.0 May 13 2015
  * 
  *          This class shows how you can crawl PDFs on the web and store them in
  *          a folder. Also the program crawls and downloads html pages that
  *          contain some specific terms.
  * 
- *          CHANGE: MANY HTMLS HAVE DUPLICATE NAMES. THE PREVIOUS VERSIONS DO
- *          NOT HAVE FUNCTIONALITY TO HANDLE THEM. THIS VERSION RENAMES THE
- *          DUPLICATE HTML FILES. NO SUCH FUNCTIONALITY FOR PDFS AS THERE ARE
- *          ALMOST NO CHNCE THAT THE PDFS WILL HAVE SAME NAME.
- * 
- *          THIS VERSION ALSO KEEPS TRACK OF THE NEWLY DOWNLOADED FILES.
+ *          CHANGE:
+ *          It can now move on to page which is redirected from a homepage.
+ *          writeFile () method is modified. The log file and url file strings are now
+ *          set back to null after writing the log file because we have
+ *          now a batch of urls and folder names to come.
  * 
  * 
  */
@@ -51,6 +50,8 @@ public class PDFCrawler extends WebCrawler {
 	private static File storageFolder;
 	private static String crawlDomain = "";
 	private static File folder;
+	private int counter  = 0;
+	private String redirectURL = "";
 
 	// for log file entry
 	private static String logEntry = "";
@@ -98,7 +99,12 @@ public class PDFCrawler extends WebCrawler {
 	public boolean shouldVisit(Page page, WebURL url) {
 
 		String href = url.getURL().toLowerCase();
-
+		if(counter < 1){
+			System.out.println("Counter = " + counter);
+			System.out.println("href = " + href);
+			redirectURL = href;
+			counter ++;
+		}
 		/*
 		 * Do not crawl pages that contain the filter RegExes
 		 */
@@ -109,7 +115,7 @@ public class PDFCrawler extends WebCrawler {
 		/*
 		 * Do not crawl pages that are outside of the domain name
 		 */
-		if (href.startsWith(crawlDomain)) {
+		if (href.startsWith(crawlDomain) || href.startsWith(redirectURL)) {
 			return true;
 		}
 
@@ -271,6 +277,7 @@ public class PDFCrawler extends WebCrawler {
 
 		try {
 			FileUtils.write(logFile, logEntry, null);
+			logEntry = "";
 		} catch (IOException e) {
 			System.out.println("Error writing log File");
 		}
@@ -279,6 +286,7 @@ public class PDFCrawler extends WebCrawler {
 
 		try {
 			FileUtils.write(urlFile, urlEntry, null);
+			urlEntry = "";
 		} catch (IOException e) {
 			System.out.println("Error writing URL File");
 		}

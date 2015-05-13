@@ -31,7 +31,7 @@ import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
  * 
  * 
  * @author Sustainalytics
- * @version 3.5.0 May 12 2015 internal version 2.3
+ * @version 3.6.0 May 13 2015 internal version 2.3
  *
  */
 
