@@ -2,6 +2,10 @@ package com.sustainalytics.ict;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
@@ -17,17 +21,14 @@ import edu.uci.ics.crawler4j.url.WebURL;
 
 /**
  * @author Sustainalytics
- * @version 3.6.0 May 13 2015
+ * @version 3.7.0 May 19 2015
  * 
  *          This class shows how you can crawl PDFs on the web and store them in
  *          a folder. Also the program crawls and downloads html pages that
  *          contain some specific terms.
  * 
  *          CHANGE:
- *          It can now move on to page which is redirected from a homepage.
- *          writeFile () method is modified. The log file and url file strings are now
- *          set back to null after writing the log file because we have
- *          now a batch of urls and folder names to come.
+ *          The crawler has better means to stick to the starting url domain
  * 
  * 
  */
@@ -48,10 +49,11 @@ public class PDFCrawler extends WebCrawler {
 			.compile(".*(\\.(pdf?))$");
 	// Some other parameters
 	private static File storageFolder;
-	private static String crawlDomain = "";
 	private static File folder;
 	private int counter  = 0;
 	private String redirectURL = "";
+	private static URL startingURL;
+	private static String startingDomain;
 
 	// for log file entry
 	private static String logEntry = "";
@@ -76,7 +78,16 @@ public class PDFCrawler extends WebCrawler {
 	public static void configure(String domain, String storageFolderName,
 			String companyFolderName) {
 
-		PDFCrawler.crawlDomain = domain;
+		try {
+			startingURL = new URL(domain);
+			startingDomain = startingURL.getHost();
+			if(startingDomain.startsWith("www")){
+				startingDomain = startingDomain.substring(4);
+			}
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		}
+		
 		storageFolder = new File(storageFolderName);
 
 		if (!storageFolder.exists()) {
@@ -98,10 +109,23 @@ public class PDFCrawler extends WebCrawler {
 	@Override
 	public boolean shouldVisit(Page page, WebURL url) {
 
+		System.out.println("in should visit");
 		String href = url.getURL().toLowerCase();
+		URI currentURL = null;
+		
+		try {
+			currentURL = new URI(href);
+		} catch (URISyntaxException e) {
+			e.printStackTrace();
+		}
+		
+		String currentDomain = currentURL.getHost();
+		if(currentDomain.startsWith("www")){
+			currentDomain = currentDomain.substring(4);
+			System.out.println("current " + currentDomain);
+		}
+
 		if(counter < 1){
-			System.out.println("Counter = " + counter);
-			System.out.println("href = " + href);
 			redirectURL = href;
 			counter ++;
 		}
@@ -115,7 +139,7 @@ public class PDFCrawler extends WebCrawler {
 		/*
 		 * Do not crawl pages that are outside of the domain name
 		 */
-		if (href.startsWith(crawlDomain) || href.startsWith(redirectURL)) {
+		if (startingURL.getHost().equals(currentURL.getHost()) || href.startsWith(redirectURL)) {
 			return true;
 		}
 
@@ -138,7 +162,7 @@ public class PDFCrawler extends WebCrawler {
 	 * the htmls. If PDFs are found then downlode them. Job done!
 	 */
 	@Override
-	public synchronized void visit(Page page) {
+	public void visit(Page page) {
 
 		String url = page.getWebURL().getURL();
 
@@ -146,6 +170,7 @@ public class PDFCrawler extends WebCrawler {
 		// of interest--->
 		if (page.getParseData() instanceof HtmlParseData) {
 
+			System.out.println("HTML!");
 			HtmlParseData htmlParseData = (HtmlParseData) page.getParseData();
 			String text = htmlParseData.getText();
 
