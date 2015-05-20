@@ -8,6 +8,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.regex.Pattern;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -31,6 +32,8 @@ import edu.uci.ics.crawler4j.url.WebURL;
  *          Minor change in redirection handling
  *          Major change in html downloading: instead of the text body, we are now looking
  *          into the url for keywords to download htmls
+ *          Major change in file name for html: htmls are being saved by using an SHA hashing
+ *          algorithm on the urls of the htmls files. So the names are unique.
  * 
  * 
  */
@@ -198,8 +201,8 @@ public class PDFCrawler extends WebCrawler {
 				 * name
 				 */
 
-				String htmlBaseName = FilenameUtils.removeExtension(url)
-						.replaceAll("[^a-zA-Z0-9.-]", "");
+				
+				String htmlBaseName = DigestUtils.shaHex(url);
 				String htmlFileName = folder.getAbsolutePath() + "/"
 						+ htmlBaseName + ".html";
 				/*
