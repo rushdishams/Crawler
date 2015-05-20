@@ -21,14 +21,16 @@ import edu.uci.ics.crawler4j.url.WebURL;
 
 /**
  * @author Sustainalytics
- * @version 3.7.0 May 19 2015
+ * @version 3.8.0 May 20 2015
  * 
  *          This class shows how you can crawl PDFs on the web and store them in
  *          a folder. Also the program crawls and downloads html pages that
  *          contain some specific terms.
  * 
  *          CHANGE:
- *          The crawler has better means to stick to the starting url domain
+ *          Minor change in redirection handling
+ *          Major change in html downloading: instead of the text body, we are now looking
+ *          into the url for keywords to download htmls
  * 
  * 
  */
@@ -48,12 +50,12 @@ public class PDFCrawler extends WebCrawler {
 	private static final Pattern pdfPatterns = Pattern
 			.compile(".*(\\.(pdf?))$");
 	// Some other parameters
-	private static File storageFolder;
-	private static File folder;
-	private int counter  = 0;
-	private String redirectURL = "";
-	private static URL startingURL;
-	private static String startingDomain;
+	private static File storageFolder; //fixed
+	private static File folder;//read from input
+	private boolean isRedirect = false;
+	private String redirectURL = "";//store redirected url if any
+	private static URL startingURL;//company url
+	private static String startingDomain;//domain of company url
 
 	// for log file entry
 	private static String logEntry = "";
@@ -78,6 +80,7 @@ public class PDFCrawler extends WebCrawler {
 	public static void configure(String domain, String storageFolderName,
 			String companyFolderName) {
 
+		/*Extracting the domain name of the starting or company url*/
 		try {
 			startingURL = new URL(domain);
 			startingDomain = startingURL.getHost();
@@ -88,12 +91,14 @@ public class PDFCrawler extends WebCrawler {
 			e.printStackTrace();
 		}
 		
+		/*setting storage folder*/
 		storageFolder = new File(storageFolderName);
 
 		if (!storageFolder.exists()) {
 			storageFolder.mkdirs();
 		}
-
+		
+		/*setting company folders*/
 		folder = new File(storageFolder.getAbsolutePath() + "/"
 				+ companyFolderName); // company folder within storage folder
 
@@ -109,25 +114,27 @@ public class PDFCrawler extends WebCrawler {
 	@Override
 	public boolean shouldVisit(Page page, WebURL url) {
 
-		System.out.println("in should visit");
 		String href = url.getURL().toLowerCase();
+		/*Let us get the current url and its domain--->*/
 		URI currentURL = null;
-		
+
 		try {
 			currentURL = new URI(href);
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
 		}
-		
+
 		String currentDomain = currentURL.getHost();
+		
 		if(currentDomain.startsWith("www")){
 			currentDomain = currentDomain.substring(4);
-			System.out.println("current " + currentDomain);
 		}
-
-		if(counter < 1){
+		//<---getting current url's domain is done!
+		
+		/*What if the starting url is a redirection?*/
+		if(!isRedirect){
 			redirectURL = href;
-			counter ++;
+			isRedirect = true;
 		}
 		/*
 		 * Do not crawl pages that contain the filter RegExes
@@ -170,23 +177,19 @@ public class PDFCrawler extends WebCrawler {
 		// of interest--->
 		if (page.getParseData() instanceof HtmlParseData) {
 
-			System.out.println("HTML!");
-			HtmlParseData htmlParseData = (HtmlParseData) page.getParseData();
-			String text = htmlParseData.getText();
-
 			// Conditions to match a few terms--->
-			if (StringUtils.containsIgnoreCase(text, "sust")
-					|| StringUtils.containsIgnoreCase(text, "csr")
-					|| StringUtils.containsIgnoreCase(text, "report")
-					|| StringUtils.containsIgnoreCase(text, "responsibility")
-					|| StringUtils.containsIgnoreCase(text, "social")
-					|| StringUtils.containsIgnoreCase(text, "society")
-					|| StringUtils.containsIgnoreCase(text, "energy")
-					|| StringUtils.containsIgnoreCase(text, "community")
-					|| StringUtils.containsIgnoreCase(text, "human rights")
-					|| StringUtils.containsIgnoreCase(text, "child labor")
-					|| StringUtils.containsIgnoreCase(text, "sust")
-					|| StringUtils.containsIgnoreCase(text, "sppl")) {
+			if (StringUtils.containsIgnoreCase(url, "sust")
+					|| StringUtils.containsIgnoreCase(url, "csr")
+					|| StringUtils.containsIgnoreCase(url, "report")
+					|| StringUtils.containsIgnoreCase(url, "responsibility")
+					|| StringUtils.containsIgnoreCase(url, "social")
+					|| StringUtils.containsIgnoreCase(url, "society")
+					|| StringUtils.containsIgnoreCase(url, "energy")
+					|| StringUtils.containsIgnoreCase(url, "community")
+					|| StringUtils.containsIgnoreCase(url, "human rights")
+					|| StringUtils.containsIgnoreCase(url, "child labor")
+					|| StringUtils.containsIgnoreCase(url, "sust")
+					|| StringUtils.containsIgnoreCase(url, "sppl")) {
 
 				// Storing HTML--->
 				/*
@@ -222,13 +225,13 @@ public class PDFCrawler extends WebCrawler {
 								+ htmlBaseName + " ---");
 						logEntry += htmlBaseName + ".html" + "\n";
 						urlEntry += url + "\n"; // recording urls from which
-												// html pages are downloaded
+						// html pages are downloaded
 					} catch (IOException iox) {
 						System.out.println("Error storing HTMLs");
 					}
 
 				}// <--- downloading new html is done so as the writing a log
-					// for the file.
+				// for the file.
 
 				/*
 				 * If the HTML file is already present in text format
@@ -266,7 +269,7 @@ public class PDFCrawler extends WebCrawler {
 		String pdfName = FilenameUtils.getBaseName(url).replaceAll(
 				"[^a-zA-Z0-9.-]", "")
 				+ pdfExtension; // removing characters not allowed in Windows
-								// file
+		// file
 		// system
 		String pdfFileName = folder.getAbsolutePath() + "/" + pdfName;
 		File output = new File(pdfFileName); // output file
@@ -278,17 +281,17 @@ public class PDFCrawler extends WebCrawler {
 			try {
 				Files.write(page.getContentData(), new File(pdfFileName));
 				System.out
-						.println("--- I found a new PDF: " + pdfName + " ---");
+				.println("--- I found a new PDF: " + pdfName + " ---");
 				logEntry += pdfName + "\n"; // populate logEntry variable with
-											// the newly written PDF file name
+				// the newly written PDF file name
 				urlEntry += url + "\n"; // recording url from which pdf file is
-										// downloaded
+				// downloaded
 			} catch (IOException iox) {
 				System.out.println("Error storing PDFs");
 			}
 
 		}// <--- the file was new
-			// <--- Done storing PDF!
+		// <--- Done storing PDF!
 
 	}// end overridden visit() method
 
