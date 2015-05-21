@@ -6,8 +6,6 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -25,18 +23,16 @@ import edu.uci.ics.crawler4j.url.WebURL;
 
 /**
  * @author Sustainalytics
- * @version 3.8.2 May 21 2015
+ * @version 3.8.3 May 21 2015
  * 
  *          This class shows how you can crawl PDFs on the web and store them in
  *          a folder. Also the program crawls and downloads html pages that
  *          contain some specific terms.
  * 
  *          CHANGE:
- *          Minor change in redirection handling
- *          Major change in html downloading: instead of the text body, we are now looking
- *          into the url for keywords to download htmls
- *          Major change in file name for html: htmls are being saved by using an SHA hashing
- *          algorithm on the urls of the htmls files. So the names are unique.
+ *          - Time taken to visit each url in microseconds is recorded
+ *          - Set of url from each url is recorded (internal mapping)
+ *          - Time out option for pdf downloads
  * 
  * 
  */
@@ -71,6 +67,10 @@ public class PDFCrawler extends WebCrawler {
 	private static String visitDuration = "";
 	//for keeping track of the links within links
 	private static String links = "";
+	//for keeping track of the timed out pdf links
+	private static String timedOutPDFLinks = "";
+
+	private final long TIME_OUT = 1000*1000*1000;
 
 	// -------------------------------------------------------------------------------------------------------------------
 	// Method Section
@@ -100,14 +100,14 @@ public class PDFCrawler extends WebCrawler {
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
 		}
-		
+
 		/*setting storage folder*/
 		storageFolder = new File(storageFolderName);
 
 		if (!storageFolder.exists()) {
 			storageFolder.mkdirs();
 		}
-		
+
 		/*setting company folders*/
 		folder = new File(storageFolder.getAbsolutePath() + "/"
 				+ companyFolderName); // company folder within storage folder
@@ -135,12 +135,12 @@ public class PDFCrawler extends WebCrawler {
 		}
 
 		String currentDomain = currentURL.getHost();
-		
+
 		if(currentDomain.startsWith("www")){
 			currentDomain = currentDomain.substring(4);
 		}
 		//<---getting current url's domain is done!
-		
+
 		/*What if the starting url is a redirection?*/
 		if(!isRedirect){
 			redirectURL = href;
@@ -180,15 +180,16 @@ public class PDFCrawler extends WebCrawler {
 	 */
 	@Override
 	public void visit(Page page) {
-		
+
 		long startVisit = System.nanoTime();
-		
+
 		String url = page.getWebURL().getURL();
 		Set<WebURL> outgoingLinks = page.getParseData().getOutgoingUrls();
 		String setOfLinks = "\t\t";
 		setOfLinks += StringUtils.join(outgoingLinks, "\n\t\t");
-		
+
 		links += url + " has the following " + outgoingLinks.size() + " links:\n" + setOfLinks + "\n\n";
+
 
 		// if the parsed data is HTML, let's check if it contains certain terms
 		// of interest--->
@@ -215,7 +216,7 @@ public class PDFCrawler extends WebCrawler {
 				 * name
 				 */
 
-				
+
 				String htmlBaseName = DigestUtils.shaHex(url);
 				String htmlFileName = folder.getAbsolutePath() + "/"
 						+ htmlBaseName + ".html";
@@ -277,7 +278,7 @@ public class PDFCrawler extends WebCrawler {
 			long endVisit = System.nanoTime();
 			long elapsedTime = (endVisit - startVisit) / 1000;
 			visitDuration += url + " , " + elapsedTime + "\n";
-			
+
 			return;
 		}
 
@@ -294,26 +295,31 @@ public class PDFCrawler extends WebCrawler {
 		// system
 		String pdfFileName = folder.getAbsolutePath() + "/" + pdfName;
 		File output = new File(pdfFileName); // output file
-
-		// if the file is new--->
-		if (!output.exists()) {
-
-			// store PDF and add an entry to the log file--->
-			try {
-				Files.write(page.getContentData(), new File(pdfFileName));
-				System.out
-				.println("--- I found a new PDF: " + pdfName + " ---");
-				logEntry += pdfName + "\n"; // populate logEntry variable with
-				// the newly written PDF file name
-				urlEntry += url + "\n"; // recording url from which pdf file is
-				// downloaded
-			} catch (IOException iox) {
-				System.out.println("Error storing PDFs");
-			}
-
-		}// <--- the file was new
-		// <--- Done storing PDF!
 		
+		while((System.nanoTime() - startVisit) < TIME_OUT){
+			// if the file is new--->
+			if (!output.exists()) {
+
+				// store PDF and add an entry to the log file--->
+				try {
+					Files.write(page.getContentData(), new File(pdfFileName));
+					System.out
+					.println("--- I found a new PDF: " + pdfName + " ---");
+					logEntry += pdfName + "\n"; // populate logEntry variable with
+					// the newly written PDF file name
+					urlEntry += url + "\n"; // recording url from which pdf file is
+					// downloaded
+				} catch (IOException iox) {
+					System.out.println("Error storing PDFs");
+				}
+
+			}// <--- the file was new
+			// <--- Done storing PDF!
+		}//end time out check
+
+		if (!output.exists()) {
+			timedOutPDFLinks += url + "\n";
+		}
 		long endVisit = System.nanoTime();
 		long elapsedTime = (endVisit - startVisit) / 1000;
 		visitDuration += url + " , " + elapsedTime + "\n";
@@ -336,31 +342,41 @@ public class PDFCrawler extends WebCrawler {
 		}
 
 		File urlFile = new File(folder.getAbsolutePath() + "/" + "url.txt");
-		
+
 		try {
 			FileUtils.write(urlFile, urlEntry, null);
 			urlEntry = "";
 		} catch (IOException e) {
 			System.out.println("Error writing URL File");
 		}
-		
+
 		File durationFile = new File(folder.getAbsolutePath() + "/" + "duration.txt");
-		
+
 		try {
 			FileUtils.write(durationFile, visitDuration, null);
 			visitDuration = "";
 		} catch (IOException e) {
 			System.out.println("Error writing Duration File");
 		}
-		
+
 		File linkMapFile = new File(folder.getAbsolutePath() + "/" + "link.txt");
-		
+
 		try {
 			FileUtils.write(linkMapFile, links, null);
 			links = "";
 		} catch (IOException e) {
 			System.out.println("Error writing Duration File");
 		}
+		
+		File timedOutPDFTraceFile = new File(folder.getAbsolutePath() + "/" + "time-out pdfs.txt");
+
+		try {
+			FileUtils.write(timedOutPDFTraceFile, timedOutPDFLinks, null);
+			links = "";
+		} catch (IOException e) {
+			System.out.println("Error writing Duration File");
+		}
+
 
 	}// end method that writes newly written pdf and htmls to a log file
 
