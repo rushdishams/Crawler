@@ -31,7 +31,7 @@ import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
  * 
  * 
  * @author Sustainalytics
- * @version 3.8.0 May 20 2015 internal version 2.3
+ * @version 3.8.1 May 21 2015 internal version 2.3
  *
  */
 
@@ -140,7 +140,7 @@ public class PDFCrawlController {
 			config.setMaxPagesToFetch(-1); // Infinite fetching of pages
 			config.setIncludeHttpsPages(true); // We move to secured http as well
 			config.setMaxDownloadSize(20000000); // Quite a huge file size. In bytes
-
+			
 			PageFetcher pageFetcher = new PageFetcher(config);
 			RobotstxtConfig robotstxtConfig = new RobotstxtConfig();
 			RobotstxtServer robotstxtServer = new RobotstxtServer(robotstxtConfig, pageFetcher);

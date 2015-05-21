@@ -6,6 +6,8 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.regex.Pattern;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -22,7 +24,7 @@ import edu.uci.ics.crawler4j.url.WebURL;
 
 /**
  * @author Sustainalytics
- * @version 3.8.0 May 20 2015
+ * @version 3.8.1 May 21 2015
  * 
  *          This class shows how you can crawl PDFs on the web and store them in
  *          a folder. Also the program crawls and downloads html pages that
@@ -64,6 +66,8 @@ public class PDFCrawler extends WebCrawler {
 	private static String logEntry = "";
 	// for tracking urls from which files are downloaded
 	private static String urlEntry = "";
+	//for tracking time to visit a url
+	private static String visitDuration = "";
 
 	// -------------------------------------------------------------------------------------------------------------------
 	// Method Section
@@ -173,7 +177,9 @@ public class PDFCrawler extends WebCrawler {
 	 */
 	@Override
 	public void visit(Page page) {
-
+		
+		long startVisit = System.nanoTime();
+		
 		String url = page.getWebURL().getURL();
 
 		// if the parsed data is HTML, let's check if it contains certain terms
@@ -260,6 +266,10 @@ public class PDFCrawler extends WebCrawler {
 		 * Return if there is no PDF ....
 		 */
 		if (!pdfPatterns.matcher(url).matches()) {
+			long endVisit = System.nanoTime();
+			long elapsedTime = (endVisit - startVisit) / 1000;
+			visitDuration += url + " , " + elapsedTime + "\n";
+			
 			return;
 		}
 
@@ -295,6 +305,10 @@ public class PDFCrawler extends WebCrawler {
 
 		}// <--- the file was new
 		// <--- Done storing PDF!
+		
+		long endVisit = System.nanoTime();
+		long elapsedTime = (endVisit - startVisit) / 1000;
+		visitDuration += url + " , " + elapsedTime + "\n";
 
 	}// end overridden visit() method
 
@@ -314,12 +328,21 @@ public class PDFCrawler extends WebCrawler {
 		}
 
 		File urlFile = new File(folder.getAbsolutePath() + "/" + "url.txt");
-
+		
 		try {
 			FileUtils.write(urlFile, urlEntry, null);
 			urlEntry = "";
 		} catch (IOException e) {
 			System.out.println("Error writing URL File");
+		}
+		
+		File durationFile = new File(folder.getAbsolutePath() + "/" + "duration.txt");
+		
+		try {
+			FileUtils.write(durationFile, visitDuration, null);
+			visitDuration = "";
+		} catch (IOException e) {
+			System.out.println("Error writing Duration File");
 		}
 
 	}// end method that writes newly written pdf and htmls to a log file
