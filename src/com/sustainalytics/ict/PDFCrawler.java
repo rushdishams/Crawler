@@ -8,6 +8,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -24,7 +25,7 @@ import edu.uci.ics.crawler4j.url.WebURL;
 
 /**
  * @author Sustainalytics
- * @version 3.8.1 May 21 2015
+ * @version 3.8.2 May 21 2015
  * 
  *          This class shows how you can crawl PDFs on the web and store them in
  *          a folder. Also the program crawls and downloads html pages that
@@ -68,6 +69,8 @@ public class PDFCrawler extends WebCrawler {
 	private static String urlEntry = "";
 	//for tracking time to visit a url
 	private static String visitDuration = "";
+	//for keeping track of the links within links
+	private static String links = "";
 
 	// -------------------------------------------------------------------------------------------------------------------
 	// Method Section
@@ -181,6 +184,11 @@ public class PDFCrawler extends WebCrawler {
 		long startVisit = System.nanoTime();
 		
 		String url = page.getWebURL().getURL();
+		Set<WebURL> outgoingLinks = page.getParseData().getOutgoingUrls();
+		String setOfLinks = "\t\t";
+		setOfLinks += StringUtils.join(outgoingLinks, "\n\t\t");
+		
+		links += url + " has the following " + outgoingLinks.size() + " links:\n" + setOfLinks + "\n\n";
 
 		// if the parsed data is HTML, let's check if it contains certain terms
 		// of interest--->
@@ -341,6 +349,15 @@ public class PDFCrawler extends WebCrawler {
 		try {
 			FileUtils.write(durationFile, visitDuration, null);
 			visitDuration = "";
+		} catch (IOException e) {
+			System.out.println("Error writing Duration File");
+		}
+		
+		File linkMapFile = new File(folder.getAbsolutePath() + "/" + "link.txt");
+		
+		try {
+			FileUtils.write(linkMapFile, links, null);
+			links = "";
 		} catch (IOException e) {
 			System.out.println("Error writing Duration File");
 		}
