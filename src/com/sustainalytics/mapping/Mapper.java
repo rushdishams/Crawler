@@ -7,6 +7,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -32,7 +33,13 @@ public class Mapper extends WebCrawler {
 	// -------------------------------------------------------------------------------------------------------------------
 	// Variable section
 	// -------------------------------------------------------------------------------------------------------------------
-
+	// Where we should not go crawling
+	private static final Pattern filters = Pattern
+			.compile(".*\\.(bmp|ashx|gif|jpe?g|png|tiff?|ico|xaml|pict|rif|pptx?|ps"
+					+ "|mid|mp2|mp3|mp4|wav|wma|au|aiff|flac|ogg|3gp|aac|amr|au|vox"
+					+ "|avi|mov|mpe?g|ra?m|m4v|smil|wm?v|swf|aaf|asf|flv|mkv"
+					+ "|zip|rar|gz|7z|aac|ace|alz|apk|arc|arj|dmg|jar|lzip|lha|css|js|bmp|gif|jpe?g|png|tiff?)"
+					+ "(\\?.*)?$"); // For url Query parts ( URL?q=... )
 	// Some other parameters
 	private static File storageFolder; //fixed
 	private static File folder;//read from input
@@ -120,6 +127,13 @@ public class Mapper extends WebCrawler {
 			redirectURL = href;
 			isRedirect = true;
 		}
+		
+		/*
+		 * Do not crawl pages that contain the filter RegExes
+		 */
+		if (filters.matcher(href).matches()) {
+			return false;
+		}
 
 		/*
 		 * Do not crawl pages that are outside of the domain name
@@ -155,7 +169,7 @@ public class Mapper extends WebCrawler {
 		links += url + "\n" + setOfLinks + "\n";
 
 		//<--- recording of outgoing links from current url is done!
-		
+
 		long endVisit = System.nanoTime();
 		long elapsedTime = (endVisit - startVisit) / 1000;		
 		visitDuration += url + " , " + elapsedTime + "\n";
