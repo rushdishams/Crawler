@@ -31,7 +31,7 @@ import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
  * 
  * 
  * @author Sustainalytics
- * @version 3.8.3 May 21 2015 internal version 2.3
+ * @version 4.0.1 June 03 2015 internal version 2.4
  *
  */
 
@@ -159,8 +159,12 @@ public class PDFCrawlController {
 			// Set the crawler with all the configurations and start it
 			PDFCrawler.configure(url.trim(), storageFolder, folder.trim());
 			controller.start(PDFCrawler.class, numberOfCrawlers);
-
+		
 			PDFCrawler.writeLogFile();
+			
+	
+			controller.shutdown();
+			
 		}// <--- exits from here when all the lines of the input file are being read
 		
 		Instant end = Instant.now();
